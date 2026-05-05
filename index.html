@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>药小助 - AI用药提醒助手</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: #f0f4f8;
+            min-height: 100vh;
+            color: #1a202c;
+        }
+
+        .app-container {
+            max-width: 420px;
+            margin: 0 auto;
+            min-height: 100vh;
+            background: #ffffff;
+            box-shadow: 0 0 40px rgba(0,0,0,0.08);
+            position: relative;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 24px 20px 20px;
+            color: white;
+            position: relative;
+            z-index: 5;
+        }
+
+        .header h1 {
+            font-size: 22px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .header p {
+            font-size: 13px;
+            opacity: 0.85;
+            margin-top: 6px;
+        }
+
+        .tab-bar {
+            display: flex;
+            background: #fff;
+            border-bottom: 1px solid #e2e8f0;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 14px 0;
+            text-align: center;
+            font-size: 14px;
+            font-weight: 500;
+            color: #718096;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+            user-select: none;
+        }
+
+        .tab:hover {
+            color: #667eea;
+            background: #f7fafc;
+        }
+
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+            padding: 20px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .input-section {
+            margin-bottom: 20px;
+        }
+
+        .input-section label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: #4a5568;
+            margin-bottom: 8px;
+        }
+
+        .input-section textarea {
+            width: 100%;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 14px;
+            font-size: 14px;
+            line-height: 1.6;
+            resize: none;
+            height: 160px;
+            transition: border-color 0.2s;
+            font-family: inherit;
+        }
+
+        .input-section textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .input-section textarea::placeholder {
+            color: #a0aec0;
+        }
+
+        .example-btn {
+            display: inline-block;
+            padding: 6px 12px;
+            background: #edf2f7;
+            border-radius: 6px;
+            font-size: 12px;
+            color: #4a5568;
+            cursor: pointer;
+            margin-top: 8px;
+            border: none;
+            transition: background 0.2s;
+        }
+
+        .example-btn:hover {
+            background: #e2e8f0;
+        }
+
+        .parse-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.2s;
+            margin-top: 16px;
+        }
+
+        .parse-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .parse-btn:active {
+            transform: translateY(0);
+        }
+
+        .parse-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .parse-result {
+            margin-top: 20px;
+            display: none;
+        }
+
+        .parse-result.show {
+            display: block;
+        }
+
+        .med-card {
+            background: #f7fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            position: relative;
+            transition: box-shadow 0.2s;
+        }
+
+        .med-card:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+
+        .med-card .med-name {
+            font-size: 16px;
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 8px;
+        }
+
+        .med-card .med-detail {
+            font-size: 13px;
+            color: #718096;
+            line-height: 1.8;
+        }
+
+        .med-card .med-detail span {
+            display: inline-block;
+            background: #edf2f7;
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin: 2px 4px 2px 0;
+        }
+
+        .med-card .med-time {
+            margin-top: 10px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .time-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            background: #ebf4ff;
+            color: #3182ce;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .schedule-empty {
+            text-align: center;
+            padding: 60px 20px;
+            color: #a0aec0;
+        }
+
+        .schedule-empty .icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+
+        .timeline {
+            position: relative;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 20px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: #e2e8f0;
+        }
+
+        .timeline-item {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 24px;
+            position: relative;
+        }
+
+        .timeline-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #667eea;
+            margin-top: 4px;
+            flex-shrink: 0;
+            position: relative;
+            left: 15px;
+            z-index: 1;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15);
+        }
+
+        .timeline-dot.morning { background: #f6ad55; box-shadow: 0 0 0 4px rgba(246, 173, 85, 0.15); }
+        .timeline-dot.noon { background: #48bb78; box-shadow: 0 0 0 4px rgba(72, 187, 120, 0.15); }
+        .timeline-dot.evening { background: #667eea; box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15); }
+        .timeline-dot.night { background: #9f7aea; box-shadow: 0 0 0 4px rgba(159, 122, 234, 0.15); }
+
+        .timeline-content {
+            flex: 1;
+            background: #f7fafc;
+            border-radius: 12px;
+            padding: 14px 16px;
+            margin-left: 8px;
+        }
+
+        .timeline-time {
+            font-size: 13px;
+            font-weight: 700;
+            color: #4a5568;
+            margin-bottom: 6px;
+        }
+
+        .timeline-meds {
+            font-size: 13px;
+            color: #718096;
+            line-height: 1.8;
+        }
+
+        .timeline-meds .med-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 0;
+            border-bottom: 1px dashed #e2e8f0;
+        }
+
+        .timeline-meds .med-item:last-child {
+            border-bottom: none;
+        }
+
+        .check-btn {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            border: 2px solid #cbd5e0;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            background: white;
+        }
+
+        .check-btn.checked {
+            background: #48bb78;
+            border-color: #48bb78;
+        }
+
+        .check-btn.checked::after {
+            content: '\2713';
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .chat-container {
+            height: calc(100vh - 220px);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding-bottom: 16px;
+        }
+
+        .chat-bubble {
+            margin-bottom: 16px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .chat-bubble.user {
+            flex-direction: row-reverse;
+        }
+
+        .chat-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        .chat-bubble.bot .chat-avatar {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .chat-bubble.user .chat-avatar {
+            background: #edf2f7;
+        }
+
+        .chat-text {
+            max-width: 75%;
+            padding: 12px 16px;
+            border-radius: 16px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .chat-bubble.bot .chat-text {
+            background: #f7fafc;
+            border: 1px solid #e2e8f0;
+            border-top-left-radius: 4px;
+        }
+
+        .chat-bubble.user .chat-text {
+            background: #667eea;
+            color: white;
+            border-top-right-radius: 4px;
+        }
+
+        .chat-input-area {
+            display: flex;
+            gap: 8px;
+            padding-top: 12px;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .chat-input {
+            flex: 1;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 24px;
+            padding: 10px 16px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .chat-input:focus {
+            border-color: #667eea;
+        }
+
+        .chat-send {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border: none;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.1s;
+        }
+
+        .chat-send:hover {
+            transform: scale(1.05);
+        }
+
+        .quick-questions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .quick-q {
+            padding: 6px 12px;
+            background: #ebf4ff;
+            color: #3182ce;
+            border-radius: 20px;
+            font-size: 12px;
+            cursor: pointer;
+            border: none;
+            transition: background 0.2s;
+        }
+
+        .quick-q:hover {
+            background: #bee3f8;
+        }
+
+        .loading {
+            display: inline-flex;
+            gap: 4px;
+            padding: 8px 0;
+        }
+
+        .loading span {
+            width: 6px;
+            height: 6px;
+            background: #667eea;
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out;
+        }
+
+        .loading span:nth-child(1) { animation-delay: 0s; }
+        .loading span:nth-child(2) { animation-delay: 0.2s; }
+        .loading span:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        .stats-bar {
+            display: flex;
+            gap: 12px;
+            margin-top: 16px;
+            padding: 14px;
+            background: linear-gradient(135deg, #f6f9fc, #edf2f7);
+            border-radius: 12px;
+        }
+
+        .stat-item {
+            flex: 1;
+            text-align: center;
+        }
+
+        .stat-num {
+            font-size: 20px;
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: #718096;
+            margin-top: 2px;
+        }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.show {
+            display: flex;
+        }
+
+        .modal {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            width: 90%;
+            max-width: 360px;
+        }
+
+        .modal h3 {
+            font-size: 16px;
+            margin-bottom: 12px;
+        }
+
+        .modal input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            margin-bottom: 12px;
+        }
+
+        .modal input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .modal-btns {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+
+        .modal-btns button {
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            cursor: pointer;
+            border: none;
+        }
+
+        .modal-btns .cancel {
+            background: #edf2f7;
+            color: #4a5568;
+        }
+
+        .modal-btns .confirm {
+            background: #667eea;
+            color: white;
+        }
+
+        .settings-btn {
+            position: absolute;
+            right: 20px;
+            top: 28px;
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 6;
+        }
+
+        .settings-btn:hover {
+            background: rgba(255,255,255,0.35);
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="header">
+            <h1>&#x1F48A; 药小助</h1>
+            <p>AI 智能用药提醒，再也不怕忘吃药</p>
+            <button class="settings-btn" id="settings-btn">&#x2699;</button>
+        </div>
+
+        <div class="tab-bar">
+            <div class="tab active" data-tab="input">录入药品</div>
+            <div class="tab" data-tab="schedule">今日用药</div>
+            <div class="tab" data-tab="chat">用药问答</div>
+        </div>
+
+        <div class="tab-content active" id="tab-input">
+            <div class="input-section">
+                <label>输入处方信息或药品说明</label>
+                <textarea id="rx-input" placeholder="粘贴处方内容，或手动输入药品信息，例如：&#10;阿莫西林胶囊 0.5g 每日3次 饭后服用&#10;布洛芬缓释胶囊 0.3g 每日2次 早晚饭后&#10;氯雷他定片 10mg 每日1次 睡前服用"></textarea>
+                <button class="example-btn" id="example-btn">&#x1F4CB; 填入示例处方</button>
+            </div>
+            <button class="parse-btn" id="parse-btn">&#x1F916; AI 智能解析</button>
+            <div class="parse-result" id="parse-result"></div>
+        </div>
+
+        <div class="tab-content" id="tab-schedule">
+            <div id="schedule-content">
+                <div class="schedule-empty">
+                    <div class="icon">&#x1F4CB;</div>
+                    <p>还没有用药计划</p>
+                    <p style="font-size:12px;margin-top:8px;">先去「录入药品」添加药品吧</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-content" id="tab-chat">
+            <div class="chat-container">
+                <div class="quick-questions" id="quick-questions"></div>
+                <div class="chat-messages" id="chat-messages">
+                    <div class="chat-bubble bot">
+                        <div class="chat-avatar">&#x1F48A;</div>
+                        <div class="chat-text">你好！我是药小助，可以回答你关于用药的问题。先录入药品，我就能提供更精准的建议。</div>
+                    </div>
+                </div>
+                <div class="chat-input-area">
+                    <input class="chat-input" id="chat-input" placeholder="输入用药问题...">
+                    <button class="chat-send" id="chat-send-btn">&#x2191;</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="api-modal">
+        <div class="modal">
+            <h3>&#x2699;&#xFE0F; 设置 API Key</h3>
+            <p style="font-size:12px;color:#718096;margin-bottom:12px;">输入你的 AI API Key（支持 OpenAI / DeepSeek / 通义千问等兼容接口）</p>
+            <input id="api-base-input" placeholder="API Base URL（可选）" value="">
+            <input id="api-key-input" placeholder="API Key" type="password">
+            <input id="api-model-input" placeholder="模型名称（如 gpt-4o-mini）" value="">
+            <div class="modal-btns">
+                <button class="cancel" id="modal-cancel">取消</button>
+                <button class="confirm" id="modal-confirm">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            'use strict';
+
+            var medications = [];
+            var schedule = [];
+            var apiConfig = { baseUrl: 'https://api.deepseek.com/v1', apiKey: '', model: 'deepseek-chat' };
+
+            try {
+                var saved = localStorage.getItem('medReminder_api');
+                if (saved) apiConfig = JSON.parse(saved);
+            } catch (e) {}
+
+            function $(id) { return document.getElementById(id); }
+
+            // --- Tabs ---
+            var tabs = document.querySelectorAll('.tab');
+            for (var i = 0; i < tabs.length; i++) {
+                (function(tab) {
+                    tab.addEventListener('click', function() {
+                        for (var j = 0; j < tabs.length; j++) tabs[j].classList.remove('active');
+                        var contents = document.querySelectorAll('.tab-content');
+                        for (var j = 0; j < contents.length; j++) contents[j].classList.remove('active');
+                        tab.classList.add('active');
+                        $('tab-' + tab.getAttribute('data-tab')).classList.add('active');
+                    });
+                })(tabs[i]);
+            }
+
+            // --- Settings modal ---
+            $('settings-btn').addEventListener('click', function() {
+                $('api-base-input').value = apiConfig.baseUrl;
+                $('api-key-input').value = apiConfig.apiKey;
+                $('api-model-input').value = apiConfig.model;
+                $('api-modal').classList.add('show');
+            });
+
+            $('modal-cancel').addEventListener('click', function() {
+                $('api-modal').classList.remove('show');
+            });
+
+            $('modal-confirm').addEventListener('click', function() {
+                apiConfig.baseUrl = $('api-base-input').value.trim();
+                apiConfig.apiKey = $('api-key-input').value.trim();
+                apiConfig.model = $('api-model-input').value.trim();
+                try { localStorage.setItem('medReminder_api', JSON.stringify(apiConfig)); } catch(e) {}
+                $('api-modal').classList.remove('show');
+            });
+
+            $('api-modal').addEventListener('click', function(e) {
+                if (e.target === this) this.classList.remove('show');
+            });
+
+            // --- Example ---
+            $('example-btn').addEventListener('click', function() {
+                $('rx-input').value =
+                    '阿莫西林胶囊 0.5g 每日3次 饭后30分钟服用 连服7天\n' +
+                    '布洛芬缓释胶囊 0.3g 每日2次 早晚饭后服用\n' +
+                    '氯雷他定片 10mg 每日1次 睡前服用\n' +
+                    '奥美拉唑肠溶胶囊 20mg 每日1次 晨起空腹';
+            });
+
+            // --- Quick questions ---
+            var questions = [
+                { text: '药物冲突？', q: '这些药有冲突吗？' },
+                { text: '能喝酒吗？', q: '吃药期间能喝酒吗？' },
+                { text: '忘吃怎么办？', q: '忘吃了怎么补？' },
+                { text: '副作用？', q: '有什么副作用？' }
+            ];
+            var qqContainer = $('quick-questions');
+            questions.forEach(function(item) {
+                var btn = document.createElement('button');
+                btn.className = 'quick-q';
+                btn.textContent = item.text;
+                btn.addEventListener('click', function() {
+                    $('chat-input').value = item.q;
+                    sendChat();
+                });
+                qqContainer.appendChild(btn);
+            });
+
+            // --- Parse ---
+            $('parse-btn').addEventListener('click', parseRx);
+
+            async function parseRx() {
+                var input = $('rx-input').value.trim();
+                if (!input) return;
+
+                var btn = $('parse-btn');
+                btn.disabled = true;
+                btn.textContent = '🔄 AI 解析中...';
+
+                try {
+                    var result;
+                    if (apiConfig.apiKey) {
+                        var aiResult = await callAI([
+                            {
+                                role: 'system',
+                                content: '你是一个药品信息解析助手。请将用户输入的处方/药品信息解析为JSON格式。\n' +
+                                    '返回格式：\n[{\n  "name": "药品名称",\n  "dosage": "每次剂量",\n  "frequency": "每日次数(数字)",\n' +
+                                    '  "times": ["具体服药时间，如 08:00", "12:00"],\n  "notes": "注意事项（饭前/饭后等）",\n  "duration": "疗程（如有）"\n}]\n' +
+                                    '只返回JSON，不要其他内容。根据"每日X次"和注意事项推断合理的具体时间：\n' +
+                                    '- 每日1次晨起：07:00\n- 每日1次睡前：22:00\n- 每日2次早晚：08:00, 20:00\n- 每日3次：08:00, 12:30, 18:30'
+                            },
+                            { role: 'user', content: input }
+                        ]);
+                        result = JSON.parse(aiResult);
+                    } else {
+                        result = localParse(input);
+                    }
+                    medications = result;
+                    renderParseResult(result);
+                    generateSchedule(result);
+                } catch (e) {
+                    var result = localParse(input);
+                    medications = result;
+                    renderParseResult(result);
+                    generateSchedule(result);
+                }
+
+                btn.disabled = false;
+                btn.textContent = '🤖 AI 智能解析';
+            }
+
+            async function callAI(messages) {
+                if (!apiConfig.apiKey) return null;
+                var response = await fetch(apiConfig.baseUrl + '/chat/completions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiConfig.apiKey },
+                    body: JSON.stringify({ model: apiConfig.model, messages: messages, temperature: 0.3 })
+                });
+                var data = await response.json();
+                return data.choices[0].message.content;
+            }
+
+            function localParse(text) {
+                var lines = text.split('\n').filter(function(l) { return l.trim(); });
+                var meds = [];
+                lines.forEach(function(line) {
+                    var med = { name: '', dosage: '', frequency: 1, times: [], notes: '', duration: '' };
+                    var nameMatch = line.match(/^[一-鿿]+/);
+                    if (nameMatch) med.name = nameMatch[0];
+                    var dosageMatch = line.match(/(\d+\.?\d*\s*(mg|g|ml|片|粒|袋|支))/i);
+                    if (dosageMatch) med.dosage = dosageMatch[1];
+                    var freqMatch = line.match(/每日(\d+)次|一天(\d+)次|日(\d+)次/);
+                    if (freqMatch) med.frequency = parseInt(freqMatch[1] || freqMatch[2] || freqMatch[3]);
+                    if (line.indexOf('饭后') >= 0) med.notes = '饭后服用';
+                    else if (line.indexOf('饭前') >= 0) med.notes = '饭前服用';
+                    else if (line.indexOf('空腹') >= 0) med.notes = '空腹服用';
+                    else if (line.indexOf('睡前') >= 0) med.notes = '睡前服用';
+                    var durMatch = line.match(/连服(\d+)天|服用(\d+)天|(\d+)天/);
+                    if (durMatch) med.duration = (durMatch[1] || durMatch[2] || durMatch[3]) + '天';
+                    if (line.indexOf('睡前') >= 0) med.times = ['22:00'];
+                    else if (line.indexOf('晨起') >= 0 || line.indexOf('空腹') >= 0) med.times = ['07:00'];
+                    else if (med.frequency === 1) med.times = ['08:00'];
+                    else if (med.frequency === 2) med.times = ['08:00', '20:00'];
+                    else if (med.frequency === 3) med.times = ['08:00', '12:30', '18:30'];
+                    else med.times = ['08:00'];
+                    if (med.name) meds.push(med);
+                });
+                return meds;
+            }
+
+            function renderParseResult(meds) {
+                var container = $('parse-result');
+                container.classList.add('show');
+                var html = '<h3 style="font-size:15px;font-weight:600;margin-bottom:12px;">✅ 解析结果（' + meds.length + '种药品）</h3>';
+                meds.forEach(function(med) {
+                    html += '<div class="med-card">' +
+                        '<div class="med-name">' + med.name + '</div>' +
+                        '<div class="med-detail">' +
+                        '<span>💊 ' + (med.dosage || '遵医嘱') + '</span>' +
+                        '<span>🔄 每日' + med.frequency + '次</span>' +
+                        (med.notes ? '<span>📝 ' + med.notes + '</span>' : '') +
+                        (med.duration ? '<span>📅 ' + med.duration + '</span>' : '') +
+                        '</div>' +
+                        '<div class="med-time">' +
+                        med.times.map(function(t) { return '<span class="time-tag">⏰ ' + t + '</span>'; }).join('') +
+                        '</div></div>';
+                });
+                var totalFreq = meds.reduce(function(s, m) { return s + m.frequency; }, 0);
+                var allTimes = [];
+                meds.forEach(function(m) { m.times.forEach(function(t) { if (allTimes.indexOf(t) < 0) allTimes.push(t); }); });
+                html += '<div class="stats-bar">' +
+                    '<div class="stat-item"><div class="stat-num">' + meds.length + '</div><div class="stat-label">种药品</div></div>' +
+                    '<div class="stat-item"><div class="stat-num">' + totalFreq + '</div><div class="stat-label">次/天</div></div>' +
+                    '<div class="stat-item"><div class="stat-num">' + allTimes.length + '</div><div class="stat-label">个时间点</div></div>' +
+                    '</div>';
+                container.innerHTML = html;
+            }
+
+            function generateSchedule(meds) {
+                var timeSlots = {};
+                meds.forEach(function(med) {
+                    med.times.forEach(function(time) {
+                        if (!timeSlots[time]) timeSlots[time] = [];
+                        timeSlots[time].push({ name: med.name, dosage: med.dosage, notes: med.notes });
+                    });
+                });
+                schedule = Object.keys(timeSlots).sort().map(function(k) { return [k, timeSlots[k]]; });
+                renderSchedule();
+            }
+
+            function renderSchedule() {
+                var container = $('schedule-content');
+                if (schedule.length === 0) {
+                    container.innerHTML = '<div class="schedule-empty"><div class="icon">📋</div>' +
+                        '<p>还没有用药计划</p><p style="font-size:12px;margin-top:8px;">先去「录入药品」添加药品吧</p></div>';
+                    return;
+                }
+                var today = new Date();
+                var dateStr = today.getFullYear() + '年' + (today.getMonth() + 1) + '月' + today.getDate() + '日';
+                var html = '<p style="font-size:13px;color:#718096;margin-bottom:16px;">📅 ' + dateStr + ' 用药计划</p>';
+                html += '<div class="timeline">';
+                schedule.forEach(function(item) {
+                    var time = item[0], meds = item[1];
+                    var hour = parseInt(time.split(':')[0]);
+                    var period, dotClass;
+                    if (hour < 10) { period = '早晨'; dotClass = 'morning'; }
+                    else if (hour < 14) { period = '中午'; dotClass = 'noon'; }
+                    else if (hour < 20) { period = '傍晚'; dotClass = 'evening'; }
+                    else { period = '晚间'; dotClass = 'night'; }
+                    html += '<div class="timeline-item">' +
+                        '<div class="timeline-dot ' + dotClass + '"></div>' +
+                        '<div class="timeline-content">' +
+                        '<div class="timeline-time">' + time + ' ' + period + '</div>' +
+                        '<div class="timeline-meds">';
+                    meds.forEach(function(m) {
+                        html += '<div class="med-item"><span>' + m.name + ' ' + m.dosage +
+                            (m.notes ? ' (' + m.notes + ')' : '') + '</span>' +
+                            '<div class="check-btn" data-check></div></div>';
+                    });
+                    html += '</div></div></div>';
+                });
+                html += '</div>';
+                container.innerHTML = html;
+            }
+
+            // Event delegation for check buttons
+            document.addEventListener('click', function(e) {
+                if (e.target.hasAttribute('data-check') || e.target.classList.contains('check-btn')) {
+                    e.target.classList.toggle('checked');
+                }
+            });
+
+            // --- Chat ---
+            $('chat-send-btn').addEventListener('click', sendChat);
+            $('chat-input').addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') sendChat();
+            });
+
+            async function sendChat() {
+                var input = $('chat-input');
+                var msg = input.value.trim();
+                if (!msg) return;
+                input.value = '';
+                appendChat('user', msg);
+                var loadingId = 'loading-' + Date.now();
+                appendChat('bot', '<div class="loading"><span></span><span></span><span></span></div>', loadingId);
+
+                try {
+                    var reply;
+                    if (apiConfig.apiKey) {
+                        var medContext = medications.length > 0
+                            ? '当前用户的药品：' + medications.map(function(m) { return m.name + ' ' + m.dosage + ' 每日' + m.frequency + '次 ' + m.notes; }).join('；')
+                            : '用户还未录入药品。';
+                        reply = await callAI([
+                            { role: 'system', content: '你是"药小助"，一个专业友善的用药提醒助手。根据用户的用药情况回答问题。\n' + medContext + '\n回答要求：简洁实用，每次回复控制在100字以内。涉及严重问题时建议咨询医生。不要使用markdown格式。' },
+                            { role: 'user', content: msg }
+                        ]);
+                    } else {
+                        reply = getDemoReply(msg);
+                    }
+                    var loadingEl = $(loadingId);
+                    if (loadingEl) loadingEl.remove();
+                    appendChat('bot', reply);
+                } catch (e) {
+                    var loadingEl = $(loadingId);
+                    if (loadingEl) loadingEl.remove();
+                    appendChat('bot', getDemoReply(msg));
+                }
+            }
+
+            function appendChat(role, content, id) {
+                var container = $('chat-messages');
+                var div = document.createElement('div');
+                div.className = 'chat-bubble ' + role;
+                if (id) div.id = id;
+                var avatar = role === 'bot' ? '💊' : '👤';
+                div.innerHTML = '<div class="chat-avatar">' + avatar + '</div><div class="chat-text">' + content + '</div>';
+                container.appendChild(div);
+                container.scrollTop = container.scrollHeight;
+            }
+
+            function getDemoReply(msg) {
+                var medNames = medications.map(function(m) { return m.name; }).join('、') || '您的药品';
+                if (msg.indexOf('冲突') >= 0 || msg.indexOf('一起吃') >= 0 || msg.indexOf('相互') >= 0) {
+                    if (medications.length >= 2)
+                        return '根据您目前服用的' + medNames + '，布洛芬和阿莫西林可同时服用，但布洛芬可能刺激胃黏膜，建议配合奥美拉唑保护胃。氯雷他定与其他三种药无明显冲突。如有不适请及时就医。';
+                    return '请先录入您的药品信息，我才能帮您判断是否有药物相互作用。';
+                }
+                if (msg.indexOf('酒') >= 0 || msg.indexOf('喝酒') >= 0 || msg.indexOf('饮酒') >= 0)
+                    return '服药期间强烈建议避免饮酒。特别是阿莫西林、布洛芬等药物与酒精同服可能加重肝脏负担或引起不良反应。建议停药48小时后再考虑少量饮酒。';
+                if (msg.indexOf('忘') >= 0 || msg.indexOf('漏') >= 0 || msg.indexOf('补') >= 0)
+                    return '如果刚过服药时间不久（1-2小时内），可以补服。如果已经接近下次服药时间（超过两次间隔的一半），则跳过本次，下次按时服用，切勿双倍剂量补服。';
+                if (msg.indexOf('副作用') >= 0 || msg.indexOf('不良反应') >= 0) {
+                    if (medications.find(function(m) { return m.name.indexOf('布洛芬') >= 0; }))
+                        return '布洛芬常见副作用：胃部不适、恶心。建议饭后服用，配合奥美拉唑可减少胃刺激。如出现黑便、皮疹等症状请立即停药就医。';
+                    return '每种药物都可能有副作用。常见的有胃肠不适、头晕等。如果用药后出现明显不适，建议联系医生调整方案。需要我查询具体某种药的副作用吗？';
+                }
+                if (msg.indexOf('空腹') >= 0 || msg.indexOf('吃饭') >= 0)
+                    return '一般来说："饭前"指吃饭前30分钟；"饭后"指吃饭后30分钟；"空腹"指早晨起床后、进食前。遵循说明书或医嘱的时间要求，有助于药物更好吸收。';
+                return '关于"' + msg + '"，建议您遵医嘱用药。如有具体疑问，可以问我药物冲突、服药时间、副作用等问题，或咨询您的主治医生获取专业建议。';
+            }
+        })();
+    </script>
+</body>
+</html>
